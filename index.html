@@ -295,6 +295,28 @@ header h1 { font-size: clamp(1.3rem,5vw,2rem); font-weight:800; letter-spacing:3
 
 .tab-panel::-webkit-scrollbar { width:4px; }
 .tab-panel::-webkit-scrollbar-thumb { background:var(--bo); border-radius:4px; }
+
+/* ── Historique des parties ── */
+.partie-item {
+  padding: 0.7rem 0.75rem;
+  background: var(--bg);
+  border-radius: 10px;
+  margin-bottom: 0.5rem;
+}
+.partie-item:last-child { margin-bottom: 0; }
+.partie-date { font-size: 0.75rem; color: var(--mu); font-weight: 600; margin-bottom: 0.4rem; }
+.partie-scores {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+}
+.partie-team {
+  flex: 1; text-align: center;
+  font-size: clamp(0.8rem, 2.5vw, 0.95rem); font-weight: 600; color: var(--mu);
+  line-height: 1.4;
+}
+.partie-team strong { display: block; font-size: clamp(1.3rem, 5vw, 1.8rem); color: var(--tx); }
+.partie-winner { color: var(--br) !important; }
+.partie-winner strong { color: var(--br) !important; }
+.partie-vs { color: var(--bo); font-size: 1.2rem; font-weight: 300; }
 </style>
 </head>
 <body>
@@ -309,7 +331,7 @@ header h1 { font-size: clamp(1.3rem,5vw,2rem); font-weight:800; letter-spacing:3
   </div>
 
   <div class="tab-bar">
-    <button class="active" data-i="0">🎮 JEU</button>
+    <button class="active" data-i="0">🃏 JEU</button>
     <button               data-i="1">⚙️ CONFIG</button>
   </div>
 
@@ -430,6 +452,12 @@ header h1 { font-size: clamp(1.3rem,5vw,2rem); font-weight:800; letter-spacing:3
           <button class="btn-reset" id="btnReset">🔄 NOUVELLE PARTIE</button>
         </div>
 
+        <!-- Historique des parties -->
+        <div class="card" id="cardParties">
+          <div class="cfg-title">Historique des parties</div>
+          <div id="partiesList"><div class="histo-empty">Aucune partie terminée</div></div>
+        </div>
+
       </div><!-- /config -->
 
     </div><!-- /track -->
@@ -437,29 +465,33 @@ header h1 { font-size: clamp(1.3rem,5vw,2rem); font-weight:800; letter-spacing:3
 
 </div><!-- /app -->
 
+<!-- Canvas feux d'artifice — par-dessus tout -->
+<canvas id="fxCanvas" style="display:none;position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
+
 <script>
 // ═══════════════════════════════
 //  STATE
 // ═══════════════════════════════
 const DEF = {
   dealer: 0,
-  // ordre du tour : Nord(Éq1), Est(Éq2), Sud(Éq1), Ouest(Éq2)
+  // Sens horaire : Nord(idx0, Éq1) → Est(idx1, Éq2) → Sud(idx2, Éq1) → Ouest(idx3, Éq2)
   players: ['Joueur Nord','Joueur Est','Joueur Sud','Joueur Ouest'],
   eq1Name: 'Équipe 1',
   eq2Name: 'Équipe 2',
   eq1pts: 0,
   eq2pts: 0,
   target: 1000,
-  team: null,        // équipe sélectionnée pour le pli en cours
-  history: []        // [{type:'pli'|'belote', team, pts, otherPts?}]
+  team: null,
+  history: [],
+  parties: []
 };
 
 let S = clone(DEF);
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
-function save()   { try { localStorage.setItem('belote_v4', JSON.stringify(S)); } catch(e){} }
+function save()   { try { localStorage.setItem('belote_v5', JSON.stringify(S)); } catch(e){} }
 function load()   {
   try {
-    const r = localStorage.getItem('belote_v4');
+    const r = localStorage.getItem('belote_v5');
     if (r) S = Object.assign(clone(DEF), JSON.parse(r));
   } catch(e) {}
 }
@@ -533,12 +565,13 @@ function buildGrid() {
 
 function addPli(pts) {
   if (!S.team) { alert('Sélectionnez d\'abord l\'équipe qui a pris !'); return; }
-  const other = 160 - pts;
+  const isCapot = pts === 250;
+  const other = isCapot ? 0 : 160 - pts;
   S.history.push({ type:'pli', team:S.team, pts, otherPts:other });
   if (S.team===1) { S.eq1pts+=pts; S.eq2pts+=other; }
   else            { S.eq2pts+=pts; S.eq1pts+=other; }
   renderScores(); renderHisto(); save();
-  checkWin();
+  checkWin(isCapot);
 }
 
 // ═══════════════════════════════
@@ -573,11 +606,98 @@ function renderScores() {
   p2.classList.toggle('winning', S.eq2pts > S.eq1pts);
 }
 
-function checkWin() {
-  if (S.eq1pts >= S.target || S.eq2pts >= S.target) {
-    const w = S.eq1pts >= S.target ? S.eq1Name : S.eq2Name;
-    setTimeout(() => alert(`🎉 ${w} a gagné la partie !`), 150);
+function checkWin(isCapot = false) {
+  const won = S.eq1pts >= S.target || S.eq2pts >= S.target;
+  if (won || isCapot) {
+    const w = S.eq1pts >= S.eq2pts ? S.eq1Name : S.eq2Name;
+    launchFireworks();
+    setTimeout(() => {
+      const msg = isCapot && !won
+        ? `🎴 CAPOT ! ${w} remporte ce pli magistralement !`
+        : `🏆 ${w} a gagné la partie !`;
+      alert(msg);
+    }, 400);
   }
+}
+
+// ═══════════════════════════════
+//  FEUX D'ARTIFICE / CONFETTIS
+// ═══════════════════════════════
+function launchFireworks() {
+  const canvas = document.getElementById('fxCanvas');
+  canvas.style.display = 'block';
+  const ctx = canvas.getContext('2d');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const COLORS = ['#8b7355','#f5c842','#e84040','#4caf50','#2196f3','#ff9800','#e91e63','#00bcd4','#ffffff'];
+  const particles = [];
+
+  function Particle(x, y) {
+    this.x = x; this.y = y;
+    this.vx = (Math.random()-0.5)*10;
+    this.vy = (Math.random()-1.5)*10;
+    this.alpha = 1;
+    this.color = COLORS[Math.floor(Math.random()*COLORS.length)];
+    this.size  = Math.random()*6+3;
+    this.shape = Math.random() > 0.5 ? 'rect' : 'circle';
+    this.rot   = Math.random()*Math.PI*2;
+    this.rotV  = (Math.random()-0.5)*0.3;
+    this.gravity = 0.25;
+  }
+
+  // Lancer plusieurs explosions
+  const bursts = [
+    {x: canvas.width*0.25, y: canvas.height*0.35},
+    {x: canvas.width*0.75, y: canvas.height*0.3},
+    {x: canvas.width*0.5,  y: canvas.height*0.2},
+    {x: canvas.width*0.15, y: canvas.height*0.5},
+    {x: canvas.width*0.85, y: canvas.height*0.45},
+  ];
+
+  let burstIdx = 0;
+  function addBurst() {
+    if (burstIdx >= bursts.length) return;
+    const {x,y} = bursts[burstIdx++];
+    for (let i=0; i<80; i++) particles.push(new Particle(x, y));
+    if (burstIdx < bursts.length) setTimeout(addBurst, 220);
+  }
+  addBurst();
+
+  let frames = 0;
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach((p,i) => {
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.vy += p.gravity;
+      p.vx *= 0.99;
+      p.rot += p.rotV;
+      p.alpha -= 0.013;
+      if (p.alpha <= 0) { particles.splice(i,1); return; }
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle   = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      if (p.shape === 'rect') {
+        ctx.fillRect(-p.size/2, -p.size/4, p.size, p.size/2);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0,0,p.size/2,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+    frames++;
+    if (particles.length > 0 || frames < 60) {
+      requestAnimationFrame(draw);
+    } else {
+      canvas.style.display = 'none';
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+  }
+  draw();
 }
 
 // ═══════════════════════════════
@@ -631,10 +751,10 @@ function syncConfig() {
   S.eq1Name = document.getElementById('cfgEq1').value.trim()   || 'Équipe 1';
   S.eq2Name = document.getElementById('cfgEq2').value.trim()   || 'Équipe 2';
   S.target  = parseInt(document.getElementById('cfgTarget').value) || 1000;
-  S.players[0] = document.getElementById('pNord').value.trim()  || 'Joueur Nord';
-  S.players[2] = document.getElementById('pSud').value.trim()   || 'Joueur Sud';
-  S.players[1] = document.getElementById('pEst').value.trim()   || 'Joueur Est';
-  S.players[3] = document.getElementById('pOuest').value.trim() || 'Joueur Ouest';
+  S.players[0] = document.getElementById('pNord').value.trim()  || 'Joueur Nord';   // idx0
+  S.players[1] = document.getElementById('pEst').value.trim()   || 'Joueur Est';    // idx1
+  S.players[2] = document.getElementById('pSud').value.trim()   || 'Joueur Sud';    // idx2
+  S.players[3] = document.getElementById('pOuest').value.trim() || 'Joueur Ouest';  // idx3
 
   // Sync UI jeu
   document.getElementById('selEq1').textContent    = S.eq1Name;
@@ -649,14 +769,53 @@ function syncConfig() {
 });
 
 // ═══════════════════════════════
-//  RESET
+//  RESET — sauvegarde la partie en cours avant de réinitialiser
 // ═══════════════════════════════
 document.getElementById('btnReset').addEventListener('click', () => {
   if (!confirm('Réinitialiser scores et historique ?')) return;
+
+  // Sauvegarder la partie si elle a du contenu
+  if (S.eq1pts > 0 || S.eq2pts > 0) {
+    const winner = S.eq1pts >= S.eq2pts ? S.eq1Name : S.eq2Name;
+    const now = new Date();
+    const date = now.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'})
+               + ' ' + now.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    const partie = { date, eq1Name: S.eq1Name, eq2Name: S.eq2Name, eq1pts: S.eq1pts, eq2pts: S.eq2pts, winner };
+    if (!S.parties) S.parties = [];
+    S.parties.unshift(partie);          // plus récente en premier
+    if (S.parties.length > 10) S.parties.pop(); // max 10
+  }
+
   S.eq1pts=0; S.eq2pts=0; S.dealer=0; S.team=null; S.history=[];
-  renderDonneur(); renderScores(); renderTeamSel(); renderHisto(); save();
+  renderDonneur(); renderScores(); renderTeamSel(); renderHisto(); renderParties(); save();
   goTab(0);
 });
+
+// ═══════════════════════════════
+//  HISTORIQUE DES PARTIES
+// ═══════════════════════════════
+function renderParties() {
+  const list = document.getElementById('partiesList');
+  const parties = S.parties || [];
+  if (!parties.length) {
+    list.innerHTML = '<div class="histo-empty">Aucune partie terminée</div>';
+    return;
+  }
+  list.innerHTML = '';
+  parties.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'partie-item';
+    const eq1win = p.eq1pts >= p.eq2pts;
+    div.innerHTML = `
+      <div class="partie-date">${p.date}</div>
+      <div class="partie-scores">
+        <span class="partie-team ${eq1win ? 'partie-winner' : ''}">${p.eq1Name}<br><strong>${p.eq1pts}</strong></span>
+        <span class="partie-vs">—</span>
+        <span class="partie-team ${!eq1win ? 'partie-winner' : ''}">${p.eq2Name}<br><strong>${p.eq2pts}</strong></span>
+      </div>`;
+    list.appendChild(div);
+  });
+}
 
 // ═══════════════════════════════
 //  PWA — manifest inline + SW inline
@@ -721,10 +880,10 @@ function init() {
   document.getElementById('cfgEq1').value    = S.eq1Name;
   document.getElementById('cfgEq2').value    = S.eq2Name;
   document.getElementById('cfgTarget').value = S.target;
-  document.getElementById('pNord').value     = S.players[0];
-  document.getElementById('pEst').value      = S.players[1];
-  document.getElementById('pSud').value      = S.players[2];
-  document.getElementById('pOuest').value    = S.players[3];
+  document.getElementById('pNord').value     = S.players[0];  // idx0 = Nord
+  document.getElementById('pEst').value      = S.players[1];  // idx1 = Est
+  document.getElementById('pSud').value      = S.players[2];  // idx2 = Sud
+  document.getElementById('pOuest').value    = S.players[3];  // idx3 = Ouest
 
   // Sync noms équipes sur l'onglet jeu
   document.getElementById('selEq1').textContent     = S.eq1Name;
@@ -738,6 +897,7 @@ function init() {
   renderTeamSel();
   buildGrid();
   renderHisto();
+  renderParties();
 }
 
 init();
