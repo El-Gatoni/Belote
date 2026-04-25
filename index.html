@@ -1,774 +1,743 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#8b7355">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Belote">
-    <title>Belote</title>
-    <style>
-        :root {
-            --brown: #8b7355;
-            --brown-dark: #6b5344;
-            --brown-light: #a89968;
-            --bg: #f5f1e8;
-            --bg2: #ece8df;
-            --white: #ffffff;
-            --text: #2c2c2c;
-            --muted: #888;
-            --red: #c0392b;
-            --red-dark: #a93226;
-            --border: #d4ccc0;
-            --shadow: 0 4px 16px rgba(0,0,0,0.08);
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#8b7355">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Belote">
+<title>Belote</title>
 
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+<!-- ═══════════════════════════════════════
+     MANIFEST inline en base64
+     Permet l'installation PWA sans fichier externe
+════════════════════════════════════════ -->
+<script>
+(function() {
+  const manifest = {
+    name: "Belote Compteur",
+    short_name: "Belote",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#f5f1e8",
+    theme_color: "#8b7355",
+    orientation: "portrait",
+    icons: [
+      {
+        src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%238b7355'/><text y='130' x='96' text-anchor='middle' font-size='120' font-family='serif'>🎴</text></svg>`),
+        sizes: "192x192",
+        type: "image/svg+xml",
+        purpose: "any maskable"
+      }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('link');
+  link.rel  = 'manifest';
+  link.href = url;
+  document.currentScript.parentNode.insertBefore(link, document.currentScript);
+})();
+</script>
 
-        html, body {
-            height: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            overflow: hidden;
-        }
+<style>
+:root {
+  --br:  #8b7355;
+  --brd: #6b5344;
+  --brl: #a89968;
+  --bg:  #f5f1e8;
+  --bg2: #ece8df;
+  --wh:  #ffffff;
+  --tx:  #2c2c2c;
+  --mu:  #888;
+  --re:  #c0392b;
+  --bo:  #d4ccc0;
+  --sh:  0 4px 16px rgba(0,0,0,0.08);
+}
 
-        .app {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            height: 100dvh;
-        }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
-        /* ── Header ── */
-        header {
-            background: linear-gradient(135deg, var(--brown) 0%, var(--brown-dark) 100%);
-            color: white;
-            padding: clamp(0.6rem, 2vw, 1.1rem) 1rem;
-            text-align: center;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-            flex-shrink: 0;
-        }
-        header h1 {
-            font-size: clamp(1.4rem, 5vw, 2rem);
-            font-weight: 800;
-            letter-spacing: 3px;
-        }
+html, body {
+  height: 100%;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--tx);
+  overflow: hidden;
+}
 
-        /* ── Install banner ── */
-        #installBanner {
-            display: none;
-            background: var(--brown-dark);
-            color: white;
-            padding: 0.6rem 1rem;
-            text-align: center;
-            font-size: clamp(0.85rem, 2.5vw, 1rem);
-            font-weight: 600;
-            gap: 0.8rem;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        #installBanner.show { display: flex; }
-        #installBanner button {
-            background: white;
-            color: var(--brown-dark);
-            border: none;
-            padding: 0.35rem 0.8rem;
-            border-radius: 6px;
-            font-weight: 800;
-            cursor: pointer;
-            font-size: 0.9rem;
-        }
-        #dismissInstall { background: transparent !important; color: rgba(255,255,255,0.7) !important; font-size: 1.2rem !important; padding: 0.1rem 0.4rem !important; }
+.app { display:flex; flex-direction:column; height:100%; height:100dvh; }
 
-        /* ── Tab bar ── */
-        .tab-bar {
-            display: flex;
-            background: var(--white);
-            border-bottom: 3px solid var(--brown);
-            flex-shrink: 0;
-        }
-        .tab-bar button {
-            flex: 1;
-            padding: clamp(0.7rem, 2vw, 1.1rem);
-            font-size: clamp(1rem, 3.5vw, 1.25rem);
-            font-weight: 700;
-            border: none;
-            background: var(--bg);
-            color: var(--muted);
-            cursor: pointer;
-            border-bottom: 4px solid transparent;
-            transition: all 0.2s;
-        }
-        .tab-bar button.active { background: var(--white); color: var(--brown); border-bottom-color: var(--brown); }
+/* ── Header ── */
+header {
+  background: linear-gradient(135deg, var(--br) 0%, var(--brd) 100%);
+  color: white;
+  padding: clamp(0.5rem,2vw,1rem) 1rem;
+  text-align: center;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+header h1 { font-size: clamp(1.3rem,5vw,2rem); font-weight:800; letter-spacing:3px; }
 
-        /* ── Swipe container ── */
-        .tabs-wrapper { flex: 1; overflow: hidden; position: relative; }
-        .tabs-track {
-            display: flex;
-            height: 100%;
-            width: 200%;
-            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
-        }
-        .tab-panel {
-            width: 50%;
-            height: 100%;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: clamp(0.8rem, 2.5vw, 1.4rem);
-            display: flex;
-            flex-direction: column;
-            gap: clamp(0.7rem, 2vw, 1.2rem);
-        }
+/* ── Install banner ── */
+#installBanner {
+  display: none;
+  background: var(--brd);
+  color: white;
+  padding: 0.55rem 1rem;
+  font-size: clamp(0.8rem,2.5vw,0.95rem);
+  font-weight: 600;
+  gap: 0.7rem;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#installBanner.show { display:flex; }
+#installBanner .ib-btn {
+  background: white; color: var(--brd);
+  border: none; padding: 0.3rem 0.75rem;
+  border-radius: 6px; font-weight:800; cursor:pointer; font-size:0.88rem;
+}
+#installBanner .ib-x {
+  background: transparent; color: rgba(255,255,255,0.7);
+  border:none; font-size:1.15rem; cursor:pointer; padding:0 0.3rem;
+}
 
-        /* ── Cards ── */
-        .card {
-            background: var(--white);
-            border-radius: 14px;
-            box-shadow: var(--shadow);
-            padding: clamp(0.9rem, 2.5vw, 1.5rem);
-        }
+/* ── Tab bar ── */
+.tab-bar { display:flex; background:var(--wh); border-bottom:3px solid var(--br); flex-shrink:0; }
+.tab-bar button {
+  flex:1; padding:clamp(0.65rem,2vw,1rem);
+  font-size:clamp(0.95rem,3.5vw,1.2rem); font-weight:700;
+  border:none; background:var(--bg); color:var(--mu); cursor:pointer;
+  border-bottom:4px solid transparent; transition:all 0.2s;
+}
+.tab-bar button.active { background:var(--wh); color:var(--br); border-bottom-color:var(--br); }
 
-        /* ── Donneur ── */
-        .donneur-label {
-            font-size: clamp(0.85rem, 2.2vw, 1rem);
-            color: var(--muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 0.4rem;
-            text-align: center;
-        }
-        .donneur-name {
-            font-size: clamp(2rem, 8vw, 3rem);
-            font-weight: 800;
-            color: var(--brown);
-            text-align: center;
-            padding: clamp(0.5rem, 2vw, 1rem);
-            background: var(--bg);
-            border-radius: 10px;
-            margin-bottom: clamp(0.7rem, 2vw, 1.1rem);
-            min-height: 2.5rem;
-        }
-        .btn-suivant {
-            display: block;
-            width: 100%;
-            background: linear-gradient(135deg, var(--brown) 0%, var(--brown-dark) 100%);
-            color: white;
-            border: none;
-            padding: clamp(0.85rem, 2.5vw, 1.2rem);
-            font-size: clamp(1.15rem, 4vw, 1.5rem);
-            font-weight: 800;
-            border-radius: 10px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(139,115,85,0.35);
-            transition: opacity 0.15s, transform 0.15s;
-        }
-        .btn-suivant:active { opacity: 0.82; transform: scale(0.98); }
+/* ── Swipe container ── */
+.tabs-wrapper { flex:1; overflow:hidden; position:relative; }
+.tabs-track {
+  display:flex; height:100%; width:200%;
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.tab-panel {
+  width:50%; height:100%;
+  overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding:clamp(0.75rem,2.5vw,1.3rem);
+  display:flex; flex-direction:column;
+  gap:clamp(0.65rem,2vw,1.1rem);
+}
 
-        /* ── Sélection équipe ── */
-        .equipe-row { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.6rem, 2vw, 1rem); }
-        .btn-equipe {
-            padding: clamp(0.9rem, 2.5vw, 1.5rem) 0.5rem;
-            font-size: clamp(1rem, 3.5vw, 1.35rem);
-            font-weight: 800;
-            border: 3px solid var(--border);
-            background: var(--white);
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text);
-            text-align: center;
-            line-height: 1.2;
-        }
-        .btn-equipe.selected { background: var(--brown); color: white; border-color: var(--brown); }
-        .btn-equipe:active { opacity: 0.8; transform: scale(0.97); }
+/* ── Cards ── */
+.card {
+  background:var(--wh); border-radius:14px;
+  box-shadow:var(--sh); padding:clamp(0.85rem,2.5vw,1.4rem);
+}
 
-        /* ── Boutons points ── */
-        .points-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: clamp(0.35rem, 1.2vw, 0.6rem);
-        }
-        .btn-pt {
-            background: var(--bg);
-            border: 2px solid var(--border);
-            padding: clamp(0.65rem, 2vw, 1rem) 0;
-            font-size: clamp(0.95rem, 3.5vw, 1.2rem);
-            font-weight: 700;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: opacity 0.15s, transform 0.15s;
-            color: var(--text);
-        }
-        .btn-pt.special {
-            background: var(--brown);
-            color: white;
-            border-color: var(--brown);
-            grid-column: span 2;
-        }
-        .btn-pt:active { opacity: 0.7; transform: scale(0.95); }
+/* ── Donneur ── */
+.donneur-lbl {
+  font-size:clamp(0.8rem,2.2vw,0.95rem); color:var(--mu);
+  font-weight:700; text-transform:uppercase; letter-spacing:1px;
+  margin-bottom:0.35rem; text-align:center;
+}
+.donneur-name {
+  font-size:clamp(1.9rem,8vw,3rem); font-weight:800; color:var(--br);
+  text-align:center; padding:clamp(0.4rem,1.5vw,0.9rem);
+  background:var(--bg); border-radius:10px;
+  margin-bottom:clamp(0.6rem,2vw,1rem); min-height:2.4rem;
+}
+.btn-suivant {
+  display:block; width:100%;
+  background:linear-gradient(135deg,var(--br) 0%,var(--brd) 100%);
+  color:white; border:none;
+  padding:clamp(0.8rem,2.5vw,1.15rem);
+  font-size:clamp(1.1rem,4vw,1.45rem); font-weight:800;
+  border-radius:10px; cursor:pointer;
+  box-shadow:0 4px 12px rgba(139,115,85,0.35);
+  transition:opacity 0.15s,transform 0.15s;
+}
+.btn-suivant:active { opacity:0.82; transform:scale(0.98); }
 
-        /* ── Bonus ── */
-        .btn-belote {
-            width: 100%;
-            padding: clamp(0.7rem, 2vw, 1rem);
-            font-size: clamp(0.95rem, 3vw, 1.1rem);
-            font-weight: 700;
-            background: #e8f4f8;
-            border: 2px solid #b8d4dc;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text);
-        }
-        .btn-belote.active { background: var(--brown); color: white; border-color: var(--brown); }
+/* ── Sélection équipe ── */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:clamp(0.5rem,2vw,0.9rem); }
+.btn-equipe {
+  padding:clamp(0.85rem,2.5vw,1.4rem) 0.5rem;
+  font-size:clamp(0.95rem,3.5vw,1.3rem); font-weight:800;
+  border:3px solid var(--bo); background:var(--wh);
+  border-radius:12px; cursor:pointer; transition:all 0.2s;
+  color:var(--tx); text-align:center; line-height:1.2;
+}
+.btn-equipe.selected { background:var(--br); color:white; border-color:var(--br); }
+.btn-equipe:active   { opacity:0.8; transform:scale(0.97); }
 
-        /* ── Scores ── */
-        .score-row { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.6rem, 2vw, 1rem); }
-        .score-card {
-            background: var(--white);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            text-align: center;
-            padding: clamp(0.7rem, 2.5vw, 1.2rem);
-        }
-        .score-card.e1 { border-top: 5px solid var(--brown); }
-        .score-card.e2 { border-top: 5px solid var(--brown-light); }
-        .score-name {
-            font-size: clamp(0.8rem, 2.5vw, 1.05rem);
-            font-weight: 700;
-            color: var(--muted);
-            margin-bottom: 0.3rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .score-pts {
-            font-size: clamp(2.2rem, 9vw, 3.5rem);
-            font-weight: 800;
-            color: var(--brown);
-            background: var(--bg);
-            border-radius: 8px;
-            padding: 0.3rem;
-            line-height: 1.1;
-        }
-        .score-pts.winning { color: #27ae60; }
+/* ── Grille points ── */
+.points-grid {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:clamp(0.3rem,1.2vw,0.55rem);
+}
+.btn-pt {
+  background:var(--bg); border:2px solid var(--bo);
+  padding:clamp(0.6rem,2vw,0.95rem) 0;
+  font-size:clamp(0.9rem,3.5vw,1.15rem); font-weight:700;
+  border-radius:8px; cursor:pointer;
+  transition:opacity 0.15s,transform 0.15s; color:var(--tx);
+}
+.btn-pt.special {
+  background:var(--br); color:white; border-color:var(--br);
+  grid-column:span 2;
+}
+.btn-pt:active { opacity:0.7; transform:scale(0.95); }
 
-        /* ── Retour ── */
-        .btn-retour {
-            width: 100%;
-            background: var(--red);
-            color: white;
-            border: none;
-            padding: clamp(0.8rem, 2.5vw, 1.15rem);
-            font-size: clamp(1rem, 3.5vw, 1.3rem);
-            font-weight: 800;
-            border-radius: 10px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(192,57,43,0.3);
-            transition: opacity 0.15s, transform 0.15s;
-        }
-        .btn-retour:active { opacity: 0.82; transform: scale(0.98); }
+/* ── Belote one-shot ── */
+.belote-row { display:grid; grid-template-columns:1fr 1fr; gap:clamp(0.5rem,2vw,0.9rem); }
+.btn-belote {
+  padding:clamp(0.65rem,2vw,0.95rem) 0.4rem;
+  font-size:clamp(0.85rem,2.8vw,1rem); font-weight:700;
+  background:#e8f4f8; border:2px solid #b8d4dc;
+  border-radius:10px; cursor:pointer; transition:all 0.2s;
+  color:var(--tx); text-align:center; line-height:1.3;
+}
+.btn-belote:active { opacity:0.8; transform:scale(0.97); }
 
-        /* ── Historique ── */
-        .histo-title {
-            font-size: clamp(0.8rem, 2.2vw, 0.95rem);
-            font-weight: 700;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 0.6rem;
-        }
-        .histo-list { display: flex; flex-direction: column; gap: 0.4rem; }
-        .histo-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.55rem 0.8rem;
-            background: var(--bg);
-            border-radius: 8px;
-            font-size: clamp(0.85rem, 2.5vw, 1rem);
-            font-weight: 600;
-            gap: 0.5rem;
-        }
-        .histo-item.latest { border-left: 4px solid var(--brown); }
-        .hi-team { color: var(--brown); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .hi-pts  { color: var(--text); white-space: nowrap; }
-        .hi-other{ color: var(--muted); font-size: 0.88em; white-space: nowrap; }
-        .histo-empty { color: var(--muted); font-style: italic; font-size: 0.95rem; text-align: center; padding: 0.5rem; }
+/* ── Scores ── */
+.score-card {
+  background:var(--wh); border-radius:12px; box-shadow:var(--sh);
+  text-align:center; padding:clamp(0.65rem,2vw,1.1rem);
+}
+.score-card.e1 { border-top:5px solid var(--br); }
+.score-card.e2 { border-top:5px solid var(--brl); }
+.score-name {
+  font-size:clamp(0.75rem,2.5vw,1rem); font-weight:700; color:var(--mu);
+  margin-bottom:0.25rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.score-pts {
+  font-size:clamp(2rem,9vw,3.4rem); font-weight:800; color:var(--br);
+  background:var(--bg); border-radius:8px; padding:0.25rem; line-height:1.1;
+}
+.score-pts.winning { color:#27ae60; }
 
-        /* ── Config ── */
-        .cfg-title {
-            font-size: clamp(1.2rem, 4vw, 1.6rem);
-            font-weight: 800;
-            color: var(--brown);
-            margin-bottom: 0.9rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--bg2);
-        }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; font-size: clamp(0.9rem, 2.5vw, 1.05rem); font-weight: 700; color: #555; margin-bottom: 0.35rem; }
-        .form-group input {
-            width: 100%;
-            padding: clamp(0.65rem, 2vw, 0.9rem);
-            font-size: clamp(1rem, 3vw, 1.15rem);
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            font-family: inherit;
-            background: var(--bg);
-            color: var(--text);
-            transition: border-color 0.2s;
-        }
-        .form-group input:focus { outline: none; border-color: var(--brown); background: white; }
+/* ── Retour ── */
+.btn-retour {
+  width:100%; background:var(--re); color:white; border:none;
+  padding:clamp(0.75rem,2.5vw,1.1rem);
+  font-size:clamp(0.95rem,3.5vw,1.25rem); font-weight:800;
+  border-radius:10px; cursor:pointer;
+  box-shadow:0 4px 12px rgba(192,57,43,0.3);
+  transition:opacity 0.15s,transform 0.15s;
+}
+.btn-retour:active { opacity:0.82; transform:scale(0.98); }
 
-        .players-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
-        .player-card { background: var(--bg); padding: 0.8rem; border-radius: 10px; border: 2px solid var(--border); }
-        .player-pos { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.35rem; }
-        .player-card input {
-            width: 100%;
-            padding: 0.45rem 0.6rem;
-            font-size: clamp(0.9rem, 3vw, 1.05rem);
-            font-weight: 700;
-            border: 2px solid var(--border);
-            border-radius: 6px;
-            font-family: inherit;
-            background: white;
-        }
-        .player-card input:focus { outline: none; border-color: var(--brown); }
+/* ── Historique ── */
+.histo-title {
+  font-size:clamp(0.75rem,2.2vw,0.9rem); font-weight:700; color:var(--mu);
+  text-transform:uppercase; letter-spacing:1px; margin-bottom:0.55rem;
+}
+.histo-list { display:flex; flex-direction:column; gap:0.35rem; }
+.histo-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:0.5rem 0.75rem; background:var(--bg); border-radius:8px;
+  font-size:clamp(0.8rem,2.5vw,0.95rem); font-weight:600; gap:0.4rem;
+}
+.histo-item.latest { border-left:4px solid var(--br); }
+.hi-team  { color:var(--br); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hi-pts   { color:var(--tx); white-space:nowrap; }
+.hi-other { color:var(--mu); font-size:0.87em; white-space:nowrap; }
+.histo-empty { color:var(--mu); font-style:italic; font-size:0.9rem; text-align:center; padding:0.4rem; }
 
-        .btn-reset {
-            width: 100%;
-            background: var(--red);
-            color: white;
-            border: none;
-            padding: clamp(0.85rem, 2.5vw, 1.15rem);
-            font-size: clamp(1rem, 3.5vw, 1.25rem);
-            font-weight: 800;
-            border-radius: 10px;
-            cursor: pointer;
-            margin-top: 0.5rem;
-            transition: opacity 0.15s;
-        }
-        .btn-reset:active { opacity: 0.82; }
+/* ── Config ── */
+.cfg-title {
+  font-size:clamp(1.1rem,4vw,1.5rem); font-weight:800; color:var(--br);
+  margin-bottom:0.85rem; padding-bottom:0.45rem; border-bottom:2px solid var(--bg2);
+}
+.form-group { margin-bottom:0.9rem; }
+.form-group label { display:block; font-size:clamp(0.85rem,2.5vw,1rem); font-weight:700; color:#555; margin-bottom:0.3rem; }
+.form-group input {
+  width:100%; padding:clamp(0.6rem,2vw,0.85rem);
+  font-size:clamp(0.95rem,3vw,1.1rem);
+  border:2px solid var(--bo); border-radius:8px;
+  font-family:inherit; background:var(--bg); color:var(--tx);
+  transition:border-color 0.2s;
+}
+.form-group input:focus { outline:none; border-color:var(--br); background:white; }
 
-        /* Scrollbar */
-        .tab-panel::-webkit-scrollbar { width: 4px; }
-        .tab-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-    </style>
+.team-block { margin-bottom:0.5rem; }
+.team-lbl {
+  display:flex; align-items:center; gap:0.45rem;
+  font-size:clamp(0.9rem,2.8vw,1.05rem); font-weight:800;
+  color:var(--tx); margin-bottom:0.7rem;
+}
+.team-lbl small { font-weight:600; color:var(--mu); font-size:0.88em; }
+.dot { width:13px; height:13px; border-radius:50%; flex-shrink:0; }
+.dot1 { background:var(--br); }
+.dot2 { background:var(--brl); }
+.team-sep { height:2px; background:var(--bg2); border-radius:2px; margin:1.1rem 0; }
+
+.players-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.65rem; }
+.player-card { background:var(--bg); padding:0.75rem; border-radius:10px; border:2px solid var(--bo); }
+.player-card.bc1 { border-color:var(--br); }
+.player-card.bc2 { border-color:var(--brl); }
+.player-pos { font-size:0.75rem; font-weight:700; color:var(--mu); text-transform:uppercase; letter-spacing:1px; margin-bottom:0.3rem; }
+.player-card input {
+  width:100%; padding:0.4rem 0.55rem;
+  font-size:clamp(0.88rem,3vw,1.05rem); font-weight:700;
+  border:2px solid var(--bo); border-radius:6px; font-family:inherit; background:white;
+}
+.player-card input:focus { outline:none; border-color:var(--br); }
+
+.btn-reset {
+  width:100%; background:var(--re); color:white; border:none;
+  padding:clamp(0.8rem,2.5vw,1.1rem);
+  font-size:clamp(0.95rem,3.5vw,1.2rem); font-weight:800;
+  border-radius:10px; cursor:pointer; margin-top:0.4rem;
+  transition:opacity 0.15s;
+}
+.btn-reset:active { opacity:0.82; }
+
+.tab-panel::-webkit-scrollbar { width:4px; }
+.tab-panel::-webkit-scrollbar-thumb { background:var(--bo); border-radius:4px; }
+</style>
 </head>
 <body>
 <div class="app">
 
-    <header><h1>🎴 BELOTE</h1></header>
+  <header><h1>🎴 BELOTE</h1></header>
 
-    <div id="installBanner">
-        📲 Installer sur votre téléphone
-        <button id="installBtn">Installer</button>
-        <button id="dismissInstall">✕</button>
-    </div>
+  <div id="installBanner">
+    📲 Installer l'application
+    <button class="ib-btn" id="installBtn">Installer</button>
+    <button class="ib-x"   id="dismissBtn">✕</button>
+  </div>
 
-    <div class="tab-bar">
-        <button class="active" data-idx="0">🎮 JEU</button>
-        <button data-idx="1">⚙️ CONFIG</button>
-    </div>
+  <div class="tab-bar">
+    <button class="active" data-i="0">🎮 JEU</button>
+    <button               data-i="1">⚙️ CONFIG</button>
+  </div>
 
-    <div class="tabs-wrapper">
-        <div class="tabs-track" id="tabsTrack">
+  <div class="tabs-wrapper">
+    <div class="tabs-track" id="track">
 
-            <!-- ══ ONGLET JEU ══ -->
-            <div class="tab-panel">
+      <!-- ══ ONGLET JEU ══ -->
+      <div class="tab-panel">
 
-                <!-- Donneur -->
-                <div class="card">
-                    <div class="donneur-label">Donneur</div>
-                    <div class="donneur-name" id="donneurName">—</div>
-                    <button class="btn-suivant" id="btnSuivant">SUIVANT ▶</button>
-                </div>
+        <!-- Donneur -->
+        <div class="card">
+          <div class="donneur-lbl">Donneur</div>
+          <div class="donneur-name" id="donneurName">—</div>
+          <button class="btn-suivant" id="btnSuivant">SUIVANT ▶</button>
+        </div>
 
-                <!-- Sélection équipe -->
-                <div class="equipe-row">
-                    <button class="btn-equipe" id="btnEq1"><span id="selEq1">Équipe 1</span></button>
-                    <button class="btn-equipe" id="btnEq2"><span id="selEq2">Équipe 2</span></button>
-                </div>
+        <!-- Sélection équipe qui a pris -->
+        <div class="two-col">
+          <button class="btn-equipe" id="btnEq1"><span id="selEq1">Équipe 1</span></button>
+          <button class="btn-equipe" id="btnEq2"><span id="selEq2">Équipe 2</span></button>
+        </div>
 
-                <!-- Boutons points -->
-                <div class="card">
-                    <div class="points-grid" id="pointsGrid"></div>
-                </div>
+        <!-- Grille de points -->
+        <div class="card">
+          <div class="points-grid" id="pointsGrid"></div>
+        </div>
 
-                <!-- Bonus belote -->
-                <div id="bonusZone" style="display:none;">
-                    <button class="btn-belote" id="btnBelote">+ 20 pts — Belote Rebelote</button>
-                </div>
+        <!-- Belote Rebelote one-shot -->
+        <div class="belote-row">
+          <button class="btn-belote" id="btnBelote1">🃏 +20 Belote<br><small id="bName1">Équipe 1</small></button>
+          <button class="btn-belote" id="btnBelote2">🃏 +20 Belote<br><small id="bName2">Équipe 2</small></button>
+        </div>
 
-                <!-- Scores -->
-                <div class="score-row">
-                    <div class="score-card e1">
-                        <div class="score-name" id="scoreName1">Équipe 1</div>
-                        <div class="score-pts" id="scorePts1">0</div>
-                    </div>
-                    <div class="score-card e2">
-                        <div class="score-name" id="scoreName2">Équipe 2</div>
-                        <div class="score-pts" id="scorePts2">0</div>
-                    </div>
-                </div>
+        <!-- Scores -->
+        <div class="two-col">
+          <div class="score-card e1">
+            <div class="score-name" id="scoreName1">Équipe 1</div>
+            <div class="score-pts"  id="scorePts1">0</div>
+          </div>
+          <div class="score-card e2">
+            <div class="score-name" id="scoreName2">Équipe 2</div>
+            <div class="score-pts"  id="scorePts2">0</div>
+          </div>
+        </div>
 
-                <!-- Retour -->
-                <button class="btn-retour" id="btnRetour">↩ ANNULER DERNIER PLI</button>
+        <!-- Annuler -->
+        <button class="btn-retour" id="btnRetour">↩ ANNULER DERNIER PLI</button>
 
-                <!-- Historique -->
-                <div class="card">
-                    <div class="histo-title">Derniers plis</div>
-                    <div class="histo-list" id="histoList">
-                        <div class="histo-empty">Aucun pli enregistré</div>
-                    </div>
-                </div>
+        <!-- Historique -->
+        <div class="card">
+          <div class="histo-title">Derniers plis</div>
+          <div class="histo-list" id="histoList">
+            <div class="histo-empty">Aucun pli enregistré</div>
+          </div>
+        </div>
 
-            </div><!-- /tab jeu -->
+      </div><!-- /jeu -->
 
-            <!-- ══ ONGLET CONFIG ══ -->
-            <div class="tab-panel">
+      <!-- ══ ONGLET CONFIG ══ -->
+      <div class="tab-panel">
 
-                <div class="card">
-                    <div class="cfg-title">Joueurs</div>
-                    <div class="players-grid">
-                        <div class="player-card">
-                            <div class="player-pos">🔼 Nord</div>
-                            <input type="text" id="p1" value="Joueur 1">
-                        </div>
-                        <div class="player-card">
-                            <div class="player-pos">▶ Est</div>
-                            <input type="text" id="p2" value="Joueur 2">
-                        </div>
-                        <div class="player-card">
-                            <div class="player-pos">🔽 Sud</div>
-                            <input type="text" id="p3" value="Joueur 3">
-                        </div>
-                        <div class="player-card">
-                            <div class="player-pos">◀ Ouest</div>
-                            <input type="text" id="p4" value="Joueur 4">
-                        </div>
-                    </div>
-                </div>
+        <div class="card">
+          <div class="cfg-title">Équipes &amp; Joueurs</div>
 
-                <div class="card">
-                    <div class="cfg-title">Équipes</div>
-                    <div class="form-group">
-                        <label>Nom Équipe 1</label>
-                        <input type="text" id="cfgEq1" value="Équipe 1">
-                    </div>
-                    <div class="form-group">
-                        <label>Composition Équipe 1</label>
-                        <input type="text" id="cfgEq1comp" value="Joueur 1 – Joueur 3">
-                    </div>
-                    <div class="form-group">
-                        <label>Nom Équipe 2</label>
-                        <input type="text" id="cfgEq2" value="Équipe 2">
-                    </div>
-                    <div class="form-group">
-                        <label>Composition Équipe 2</label>
-                        <input type="text" id="cfgEq2comp" value="Joueur 2 – Joueur 4">
-                    </div>
-                </div>
+          <!-- Équipe 1 : Nord + Sud -->
+          <div class="team-block">
+            <div class="team-lbl">
+              <span class="dot dot1"></span>
+              Équipe 1 <small>— Nord 🔼 et Sud 🔽</small>
+            </div>
+            <div class="form-group">
+              <label>Nom de l'équipe</label>
+              <input type="text" id="cfgEq1" placeholder="Équipe 1">
+            </div>
+            <div class="players-grid">
+              <div class="player-card bc1">
+                <div class="player-pos">🔼 Nord</div>
+                <input type="text" id="pNord" placeholder="Joueur Nord">
+              </div>
+              <div class="player-card bc1">
+                <div class="player-pos">🔽 Sud</div>
+                <input type="text" id="pSud"  placeholder="Joueur Sud">
+              </div>
+            </div>
+          </div>
 
-                <div class="card">
-                    <div class="cfg-title">Partie</div>
-                    <div class="form-group">
-                        <label>Points à atteindre</label>
-                        <input type="number" id="cfgTarget" value="1000" min="100" step="50">
-                    </div>
-                    <button class="btn-reset" id="btnReset">🔄 NOUVELLE PARTIE</button>
-                </div>
+          <div class="team-sep"></div>
 
-            </div><!-- /tab config -->
+          <!-- Équipe 2 : Est + Ouest -->
+          <div class="team-block">
+            <div class="team-lbl">
+              <span class="dot dot2"></span>
+              Équipe 2 <small>— Est ▶ et Ouest ◀</small>
+            </div>
+            <div class="form-group">
+              <label>Nom de l'équipe</label>
+              <input type="text" id="cfgEq2" placeholder="Équipe 2">
+            </div>
+            <div class="players-grid">
+              <div class="player-card bc2">
+                <div class="player-pos">▶ Est</div>
+                <input type="text" id="pEst"   placeholder="Joueur Est">
+              </div>
+              <div class="player-card bc2">
+                <div class="player-pos">◀ Ouest</div>
+                <input type="text" id="pOuest" placeholder="Joueur Ouest">
+              </div>
+            </div>
+          </div>
+        </div>
 
-        </div><!-- /tabs-track -->
-    </div><!-- /tabs-wrapper -->
+        <div class="card">
+          <div class="cfg-title">Partie</div>
+          <div class="form-group">
+            <label>Points à atteindre pour gagner</label>
+            <input type="number" id="cfgTarget" placeholder="1000" min="100" step="50">
+          </div>
+          <button class="btn-reset" id="btnReset">🔄 NOUVELLE PARTIE</button>
+        </div>
+
+      </div><!-- /config -->
+
+    </div><!-- /track -->
+  </div><!-- /wrapper -->
 
 </div><!-- /app -->
 
 <script>
-// ══════════════════════════════════
+// ═══════════════════════════════
 //  STATE
-// ══════════════════════════════════
-const DEFAULTS = {
-    currentDealer: 0,
-    players: ['Joueur 1','Joueur 2','Joueur 3','Joueur 4'],
-    eq1Name: 'Équipe 1',
-    eq2Name: 'Équipe 2',
-    eq1comp: 'Joueur 1 – Joueur 3',
-    eq2comp: 'Joueur 2 – Joueur 4',
-    eq1pts: 0,
-    eq2pts: 0,
-    targetPts: 1000,
-    selectedTeam: null,
-    history: []
+// ═══════════════════════════════
+const DEF = {
+  dealer: 0,
+  // ordre du tour : Nord(Éq1), Est(Éq2), Sud(Éq1), Ouest(Éq2)
+  players: ['Joueur Nord','Joueur Est','Joueur Sud','Joueur Ouest'],
+  eq1Name: 'Équipe 1',
+  eq2Name: 'Équipe 2',
+  eq1pts: 0,
+  eq2pts: 0,
+  target: 1000,
+  team: null,        // équipe sélectionnée pour le pli en cours
+  history: []        // [{type:'pli'|'belote', team, pts, otherPts?}]
 };
 
-let S = JSON.parse(JSON.stringify(DEFAULTS));
-
-function loadState() {
-    try {
-        const raw = localStorage.getItem('belote_v3');
-        if (raw) S = Object.assign(JSON.parse(JSON.stringify(DEFAULTS)), JSON.parse(raw));
-    } catch(e) {}
+let S = clone(DEF);
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function save()   { try { localStorage.setItem('belote_v4', JSON.stringify(S)); } catch(e){} }
+function load()   {
+  try {
+    const r = localStorage.getItem('belote_v4');
+    if (r) S = Object.assign(clone(DEF), JSON.parse(r));
+  } catch(e) {}
 }
 
-function save() { localStorage.setItem('belote_v3', JSON.stringify(S)); }
-
-// ══════════════════════════════════
-//  TABS + SWIPE
-// ══════════════════════════════════
-const track  = document.getElementById('tabsTrack');
+// ═══════════════════════════════
+//  ONGLETS + SWIPE
+// ═══════════════════════════════
+const track  = document.getElementById('track');
 const tBtns  = document.querySelectorAll('.tab-bar button');
 let curTab = 0;
 
-function goTab(idx) {
-    curTab = idx;
-    track.style.transform = `translateX(-${idx * 50}%)`;
-    tBtns.forEach((b,i) => b.classList.toggle('active', i === idx));
+function goTab(i) {
+  curTab = i;
+  track.style.transform = `translateX(-${i*50}%)`;
+  tBtns.forEach((b,j) => b.classList.toggle('active', j===i));
 }
-tBtns.forEach(b => b.addEventListener('click', () => goTab(+b.dataset.idx)));
+tBtns.forEach(b => b.addEventListener('click', () => goTab(+b.dataset.i)));
 
-// Swipe
-let sx = null, sy = null;
-const wrapper = document.querySelector('.tabs-wrapper');
-wrapper.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
-wrapper.addEventListener('touchend', e => {
-    if (sx === null) return;
-    const dx = e.changedTouches[0].clientX - sx;
-    const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-        if (dx < 0 && curTab === 0) goTab(1);
-        if (dx > 0 && curTab === 1) goTab(0);
-    }
-    sx = null;
-}, { passive: true });
+// Swipe (ignore les scrolls verticaux)
+let tx0=null, ty0=null;
+const wr = document.querySelector('.tabs-wrapper');
+wr.addEventListener('touchstart', e => { tx0=e.touches[0].clientX; ty0=e.touches[0].clientY; }, {passive:true});
+wr.addEventListener('touchend',   e => {
+  if (tx0===null) return;
+  const dx = e.changedTouches[0].clientX - tx0;
+  const dy = e.changedTouches[0].clientY - ty0;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 48) {
+    if (dx < 0 && curTab===0) goTab(1);
+    if (dx > 0 && curTab===1) goTab(0);
+  }
+  tx0=null;
+}, {passive:true});
 
-// ══════════════════════════════════
+// ═══════════════════════════════
 //  DONNEUR
-// ══════════════════════════════════
+// ═══════════════════════════════
 function renderDonneur() {
-    document.getElementById('donneurName').textContent = S.players[S.currentDealer];
+  document.getElementById('donneurName').textContent = S.players[S.dealer];
 }
 document.getElementById('btnSuivant').addEventListener('click', () => {
-    S.currentDealer = (S.currentDealer + 1) % 4;
-    renderDonneur(); save();
+  S.dealer = (S.dealer+1) % 4;
+  renderDonneur(); save();
 });
 
-// ══════════════════════════════════
-//  ÉQUIPES
-// ══════════════════════════════════
-function renderTeamBtns() {
-    document.getElementById('btnEq1').classList.toggle('selected', S.selectedTeam === 1);
-    document.getElementById('btnEq2').classList.toggle('selected', S.selectedTeam === 2);
+// ═══════════════════════════════
+//  SÉLECTION ÉQUIPE
+// ═══════════════════════════════
+function renderTeamSel() {
+  document.getElementById('btnEq1').classList.toggle('selected', S.team===1);
+  document.getElementById('btnEq2').classList.toggle('selected', S.team===2);
 }
-document.getElementById('btnEq1').addEventListener('click', () => { S.selectedTeam = 1; renderTeamBtns(); renderBonus(); });
-document.getElementById('btnEq2').addEventListener('click', () => { S.selectedTeam = 2; renderTeamBtns(); renderBonus(); });
+document.getElementById('btnEq1').addEventListener('click', () => { S.team=1; renderTeamSel(); });
+document.getElementById('btnEq2').addEventListener('click', () => { S.team=2; renderTeamSel(); });
 
-// ══════════════════════════════════
-//  POINTS
-// ══════════════════════════════════
-const PTS_VALUES = [10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,250];
+// ═══════════════════════════════
+//  GRILLE DE POINTS
+// ═══════════════════════════════
+const PTS = [10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,250];
 
 function buildGrid() {
-    const g = document.getElementById('pointsGrid');
-    g.innerHTML = '';
-    PTS_VALUES.forEach(p => {
-        const b = document.createElement('button');
-        b.className = 'btn-pt' + (p === 250 ? ' special' : '');
-        b.textContent = p;
-        b.addEventListener('click', () => addPts(p));
-        g.appendChild(b);
-    });
+  const g = document.getElementById('pointsGrid');
+  g.innerHTML = '';
+  PTS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'btn-pt' + (p===250 ? ' special' : '');
+    b.textContent = p;
+    b.addEventListener('click', () => addPli(p));
+    g.appendChild(b);
+  });
 }
 
-function addPts(pts) {
-    if (!S.selectedTeam) { alert('Sélectionnez une équipe d\'abord !'); return; }
-    const other = 160 - pts;
-    S.history.push({ team: S.selectedTeam, pts, otherPts: other, belote: false });
-    if (S.selectedTeam === 1) { S.eq1pts += pts; S.eq2pts += other; }
-    else                      { S.eq2pts += pts; S.eq1pts += other; }
-    renderScores(); renderBonus(); renderHisto(); save();
-    checkWin();
+function addPli(pts) {
+  if (!S.team) { alert('Sélectionnez d\'abord l\'équipe qui a pris !'); return; }
+  const other = 160 - pts;
+  S.history.push({ type:'pli', team:S.team, pts, otherPts:other });
+  if (S.team===1) { S.eq1pts+=pts; S.eq2pts+=other; }
+  else            { S.eq2pts+=pts; S.eq1pts+=other; }
+  renderScores(); renderHisto(); save();
+  checkWin();
 }
 
-// ══════════════════════════════════
-//  BONUS BELOTE
-// ══════════════════════════════════
-function renderBonus() {
-    const zone = document.getElementById('bonusZone');
-    const btn  = document.getElementById('btnBelote');
-    if (!S.history.length) { zone.style.display = 'none'; return; }
-    zone.style.display = 'block';
-    const last = S.history[S.history.length - 1];
-    btn.classList.toggle('active', last.belote);
-    btn.textContent = last.belote
-        ? '✓ Belote Rebelote (+20) — Appuyer pour retirer'
-        : '+ 20 pts — Belote Rebelote';
+// ═══════════════════════════════
+//  BELOTE REBELOTE — one-shot par équipe
+//  Chaque clic ajoute +20 à l'équipe et enregistre
+//  dans l'historique (annulable via Retour)
+// ═══════════════════════════════
+function addBelote(team) {
+  S.history.push({ type:'belote', team, pts:20 });
+  if (team===1) S.eq1pts+=20;
+  else          S.eq2pts+=20;
+  renderScores(); renderHisto(); save();
 }
-document.getElementById('btnBelote').addEventListener('click', () => {
-    if (!S.history.length) return;
-    const last = S.history[S.history.length - 1];
-    const had = last.belote;
-    last.belote = !had;
-    if (last.team === 1) S.eq1pts += had ? -20 : 20;
-    else                 S.eq2pts += had ? -20 : 20;
-    renderScores(); renderBonus(); renderHisto(); save();
-});
 
-// ══════════════════════════════════
+document.getElementById('btnBelote1').addEventListener('click', () => addBelote(1));
+document.getElementById('btnBelote2').addEventListener('click', () => addBelote(2));
+
+function renderBeloteNames() {
+  document.getElementById('bName1').textContent = S.eq1Name;
+  document.getElementById('bName2').textContent = S.eq2Name;
+}
+
+// ═══════════════════════════════
 //  SCORES
-// ══════════════════════════════════
+// ═══════════════════════════════
 function renderScores() {
-    const p1 = document.getElementById('scorePts1');
-    const p2 = document.getElementById('scorePts2');
-    p1.textContent = S.eq1pts;
-    p2.textContent = S.eq2pts;
-    p1.classList.toggle('winning', S.eq1pts > S.eq2pts);
-    p2.classList.toggle('winning', S.eq2pts > S.eq1pts);
+  const p1 = document.getElementById('scorePts1');
+  const p2 = document.getElementById('scorePts2');
+  p1.textContent = S.eq1pts;
+  p2.textContent = S.eq2pts;
+  p1.classList.toggle('winning', S.eq1pts > S.eq2pts);
+  p2.classList.toggle('winning', S.eq2pts > S.eq1pts);
 }
 
 function checkWin() {
-    const t = S.targetPts;
-    if (S.eq1pts >= t || S.eq2pts >= t) {
-        const w = S.eq1pts >= t ? S.eq1Name : S.eq2Name;
-        setTimeout(() => alert(`🎉 ${w} a gagné la partie !`), 200);
-    }
+  if (S.eq1pts >= S.target || S.eq2pts >= S.target) {
+    const w = S.eq1pts >= S.target ? S.eq1Name : S.eq2Name;
+    setTimeout(() => alert(`🎉 ${w} a gagné la partie !`), 150);
+  }
 }
 
-// ══════════════════════════════════
-//  RETOUR
-// ══════════════════════════════════
+// ═══════════════════════════════
+//  ANNULER DERNIER PLI
+// ═══════════════════════════════
 document.getElementById('btnRetour').addEventListener('click', () => {
-    if (!S.history.length) { alert('Rien à annuler !'); return; }
-    const last = S.history.pop();
-    const bonus = last.belote ? 20 : 0;
-    if (last.team === 1) { S.eq1pts -= (last.pts + bonus); S.eq2pts -= last.otherPts; }
-    else                 { S.eq2pts -= (last.pts + bonus); S.eq1pts -= last.otherPts; }
-    S.eq1pts = Math.max(0, S.eq1pts);
-    S.eq2pts = Math.max(0, S.eq2pts);
-    renderScores(); renderBonus(); renderHisto(); save();
+  if (!S.history.length) { alert('Rien à annuler !'); return; }
+  const last = S.history.pop();
+  if (last.type === 'pli') {
+    if (last.team===1) { S.eq1pts -= last.pts;  S.eq2pts -= last.otherPts; }
+    else               { S.eq2pts -= last.pts;  S.eq1pts -= last.otherPts; }
+  } else {
+    // belote
+    if (last.team===1) S.eq1pts -= last.pts;
+    else               S.eq2pts -= last.pts;
+  }
+  S.eq1pts = Math.max(0, S.eq1pts);
+  S.eq2pts = Math.max(0, S.eq2pts);
+  renderScores(); renderHisto(); save();
 });
 
-// ══════════════════════════════════
+// ═══════════════════════════════
 //  HISTORIQUE
-// ══════════════════════════════════
+// ═══════════════════════════════
 function renderHisto() {
-    const list  = document.getElementById('histoList');
-    const last3 = S.history.slice(-3).reverse();
-    if (!last3.length) {
-        list.innerHTML = '<div class="histo-empty">Aucun pli enregistré</div>';
-        return;
+  const list  = document.getElementById('histoList');
+  const last3 = S.history.slice(-3).reverse();
+  if (!last3.length) {
+    list.innerHTML = '<div class="histo-empty">Aucun pli enregistré</div>';
+    return;
+  }
+  list.innerHTML = '';
+  last3.forEach((e, i) => {
+    const tName = e.team===1 ? S.eq1Name : S.eq2Name;
+    const d = document.createElement('div');
+    d.className = 'histo-item' + (i===0 ? ' latest' : '');
+    if (e.type === 'belote') {
+      d.innerHTML = `<span class="hi-team">${tName}</span><span class="hi-pts">🃏 +20 Belote</span><span class="hi-other"></span>`;
+    } else {
+      const oName = e.team===1 ? S.eq2Name : S.eq1Name;
+      d.innerHTML = `<span class="hi-team">${tName}</span><span class="hi-pts">${e.pts} pts</span><span class="hi-other">${oName} : ${e.otherPts}</span>`;
     }
-    list.innerHTML = '';
-    last3.forEach((e, i) => {
-        const tName  = e.team === 1 ? S.eq1Name : S.eq2Name;
-        const oName  = e.team === 1 ? S.eq2Name : S.eq1Name;
-        const bStr   = e.belote ? ' +20 Belote' : '';
-        const d = document.createElement('div');
-        d.className = 'histo-item' + (i === 0 ? ' latest' : '');
-        d.innerHTML = `<span class="hi-team">${tName}</span><span class="hi-pts">${e.pts}${bStr}</span><span class="hi-other">${oName} : ${e.otherPts}</span>`;
-        list.appendChild(d);
-    });
+    list.appendChild(d);
+  });
 }
 
-// ══════════════════════════════════
-//  CONFIG — live sync
-// ══════════════════════════════════
+// ═══════════════════════════════
+//  CONFIG — sync live
+// ═══════════════════════════════
 function syncConfig() {
-    S.eq1Name   = document.getElementById('cfgEq1').value      || 'Équipe 1';
-    S.eq2Name   = document.getElementById('cfgEq2').value      || 'Équipe 2';
-    S.eq1comp   = document.getElementById('cfgEq1comp').value;
-    S.eq2comp   = document.getElementById('cfgEq2comp').value;
-    S.targetPts = parseInt(document.getElementById('cfgTarget').value) || 1000;
-    for (let i = 1; i <= 4; i++) S.players[i-1] = document.getElementById(`p${i}`).value || `Joueur ${i}`;
+  S.eq1Name = document.getElementById('cfgEq1').value.trim()   || 'Équipe 1';
+  S.eq2Name = document.getElementById('cfgEq2').value.trim()   || 'Équipe 2';
+  S.target  = parseInt(document.getElementById('cfgTarget').value) || 1000;
+  S.players[0] = document.getElementById('pNord').value.trim()  || 'Joueur Nord';
+  S.players[2] = document.getElementById('pSud').value.trim()   || 'Joueur Sud';
+  S.players[1] = document.getElementById('pEst').value.trim()   || 'Joueur Est';
+  S.players[3] = document.getElementById('pOuest').value.trim() || 'Joueur Ouest';
 
-    document.getElementById('selEq1').textContent    = S.eq1Name;
-    document.getElementById('selEq2').textContent    = S.eq2Name;
-    document.getElementById('scoreName1').textContent = S.eq1Name;
-    document.getElementById('scoreName2').textContent = S.eq2Name;
-    renderDonneur(); renderHisto(); save();
+  // Sync UI jeu
+  document.getElementById('selEq1').textContent    = S.eq1Name;
+  document.getElementById('selEq2').textContent    = S.eq2Name;
+  document.getElementById('scoreName1').textContent = S.eq1Name;
+  document.getElementById('scoreName2').textContent = S.eq2Name;
+  renderBeloteNames(); renderDonneur(); renderHisto(); save();
 }
-['cfgEq1','cfgEq2','cfgEq1comp','cfgEq2comp','cfgTarget','p1','p2','p3','p4'].forEach(id => {
-    document.getElementById(id).addEventListener('input', syncConfig);
+
+['cfgEq1','cfgEq2','cfgTarget','pNord','pSud','pEst','pOuest'].forEach(id => {
+  document.getElementById(id).addEventListener('input', syncConfig);
 });
 
-// ══════════════════════════════════
+// ═══════════════════════════════
 //  RESET
-// ══════════════════════════════════
+// ═══════════════════════════════
 document.getElementById('btnReset').addEventListener('click', () => {
-    if (!confirm('Réinitialiser les scores et l\'historique ?')) return;
-    S.eq1pts = 0; S.eq2pts = 0;
-    S.currentDealer = 0; S.selectedTeam = null; S.history = [];
-    renderDonneur(); renderScores(); renderTeamBtns(); renderBonus(); renderHisto(); save();
-    goTab(0);
+  if (!confirm('Réinitialiser scores et historique ?')) return;
+  S.eq1pts=0; S.eq2pts=0; S.dealer=0; S.team=null; S.history=[];
+  renderDonneur(); renderScores(); renderTeamSel(); renderHisto(); save();
+  goTab(0);
 });
 
-// ══════════════════════════════════
-//  PWA
-// ══════════════════════════════════
+// ═══════════════════════════════
+//  PWA — manifest inline + SW inline
+// ═══════════════════════════════
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.getElementById('installBanner').classList.add('show');
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
 });
 document.getElementById('installBtn').addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') document.getElementById('installBanner').classList.remove('show');
-    deferredPrompt = null;
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome==='accepted') document.getElementById('installBanner').classList.remove('show');
+  deferredPrompt = null;
 });
-document.getElementById('dismissInstall').addEventListener('click', () => {
-    document.getElementById('installBanner').classList.remove('show');
+document.getElementById('dismissBtn').addEventListener('click', () => {
+  document.getElementById('installBanner').classList.remove('show');
 });
 window.addEventListener('appinstalled', () => {
-    document.getElementById('installBanner').classList.remove('show');
+  document.getElementById('installBanner').classList.remove('show');
 });
 
-// Service Worker inline pour PWA
+// Service Worker inline via Blob — cache l'app pour usage hors-ligne
 if ('serviceWorker' in navigator) {
-    const swCode = `
-self.addEventListener('install', e => { self.skipWaiting(); });
-self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
-self.addEventListener('fetch', e => { e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503}))); });
+  const sw = `
+const CACHE = 'belote-v1';
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll([self.registration.scope]))
+  );
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(clients.claim());
+});
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      return cached || fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => cached || new Response('Hors ligne', {status:503}));
+    })
+  );
+});
 `;
-    const blob = new Blob([swCode], { type: 'application/javascript' });
-    const swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl).catch(() => {});
+  const blob  = new Blob([sw], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, {scope: './'}).catch(() => {});
 }
 
-// ══════════════════════════════════
+// ═══════════════════════════════
 //  INIT
-// ══════════════════════════════════
+// ═══════════════════════════════
 function init() {
-    loadState();
+  load();
 
-    // Remplir config UI
-    document.getElementById('cfgEq1').value     = S.eq1Name;
-    document.getElementById('cfgEq2').value     = S.eq2Name;
-    document.getElementById('cfgEq1comp').value = S.eq1comp;
-    document.getElementById('cfgEq2comp').value = S.eq2comp;
-    document.getElementById('cfgTarget').value  = S.targetPts;
-    for (let i = 1; i <= 4; i++) document.getElementById(`p${i}`).value = S.players[i-1];
+  // Remplir config
+  document.getElementById('cfgEq1').value    = S.eq1Name;
+  document.getElementById('cfgEq2').value    = S.eq2Name;
+  document.getElementById('cfgTarget').value = S.target;
+  document.getElementById('pNord').value     = S.players[0];
+  document.getElementById('pEst').value      = S.players[1];
+  document.getElementById('pSud').value      = S.players[2];
+  document.getElementById('pOuest').value    = S.players[3];
 
-    // Remplir jeu UI
-    document.getElementById('selEq1').textContent    = S.eq1Name;
-    document.getElementById('selEq2').textContent    = S.eq2Name;
-    document.getElementById('scoreName1').textContent = S.eq1Name;
-    document.getElementById('scoreName2').textContent = S.eq2Name;
+  // Sync noms équipes sur l'onglet jeu
+  document.getElementById('selEq1').textContent     = S.eq1Name;
+  document.getElementById('selEq2').textContent     = S.eq2Name;
+  document.getElementById('scoreName1').textContent = S.eq1Name;
+  document.getElementById('scoreName2').textContent = S.eq2Name;
 
-    renderDonneur();
-    renderScores();
-    renderTeamBtns();
-    buildGrid();
-    renderBonus();
-    renderHisto();
+  renderBeloteNames();
+  renderDonneur();
+  renderScores();
+  renderTeamSel();
+  buildGrid();
+  renderHisto();
 }
 
 init();
